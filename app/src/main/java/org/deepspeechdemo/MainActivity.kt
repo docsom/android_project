@@ -7,13 +7,21 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.os.Build
 import android.os.Bundle
+import android.os.Environment
+import android.util.Log
 import android.view.View
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import kotlinx.android.synthetic.main.activity_main.*
 import org.mozilla.deepspeech.libdeepspeech.DeepSpeechModel
+import java.io.BufferedWriter
 import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
+
 
 class MainActivity : AppCompatActivity() {
     private var model: DeepSpeechModel? = null
@@ -24,14 +32,16 @@ class MainActivity : AppCompatActivity() {
     private val TFLITE_MODEL_FILENAME = "deepspeech-0.9.2-models.tflite"
     private val SCORER_FILENAME = "deepspeech-0.9.2-models.scorer"
 
-    private fun checkAudioPermission() {
-        // Permission is automatically granted on SDK < 23 upon installation.
-        if (Build.VERSION.SDK_INT >= 23) {
-            val permission = Manifest.permission.RECORD_AUDIO
+    var saveStorage = "" //저장된 파일 경로
+    var saveData = "" //저장된 파일 내용
 
-            if (checkSelfPermission(permission) != PackageManager.PERMISSION_GRANTED) {
-                ActivityCompat.requestPermissions(this, arrayOf(permission), 3)
-            }
+
+    private fun checkPermission() {
+        val permission = arrayOf(Manifest.permission.RECORD_AUDIO, Manifest.permission.WRITE_EXTERNAL_STORAGE)
+
+        if ((checkSelfPermission(permission.get(0)) != PackageManager.PERMISSION_GRANTED)
+            || (checkSelfPermission(permission.get(1)) != PackageManager.PERMISSION_GRANTED)) {
+            ActivityCompat.requestPermissions(this, permission, 3)
         }
     }
 
@@ -46,6 +56,13 @@ class MainActivity : AppCompatActivity() {
         model?.let { model ->
             val streamContext = model.createStream()
 
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.RECORD_AUDIO
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                return
+            }
             val recorder = AudioRecord(
                 MediaRecorder.AudioSource.VOICE_RECOGNITION,
                 model.sampleRate(),
@@ -67,10 +84,52 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
                 transcription.text = decoded
+                writeTextFile(decoded) // 텍스트 파일 저장
             }
 
             recorder.stop()
             recorder.release()
+        }
+    }
+
+    private fun writeTextFile(data: String) {
+        try {
+            saveData = data //TODO 변수에 값 대입
+            val currentTime : Long = System.currentTimeMillis() //TODO 현재시간 받아오기
+            val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale("ko", "KR"))
+            val nowTime = sdf.format(currentTime)
+            val textFileName = "/$nowTime.txt" //TODO 파일 생성
+            val storageDir =
+                File(getExternalFilesDir(null).toString() + "/SaveStorage") //TODO 저장 경로
+            //TODO 폴더 생성
+            if (!storageDir.exists()) { //TODO 폴더 없을 경우
+                storageDir.mkdir() //TODO 폴더 생성
+            }
+
+            val buf = BufferedWriter(
+                FileWriter(
+                    storageDir.toString() + textFileName,
+                    false
+                )
+            ) //TODO 덮어쓰기 (FALSE)
+//            buf.append("[$nowTime]\n[$saveData]") //TODO 날짜 쓰기
+//            buf.newLine() //TODO 개행
+            buf.write(saveData)
+            buf.close()
+            saveStorage = storageDir.toString() + textFileName //TODO 경로 저장 /storage 시작
+            //saveStorage = String.valueOf(storageDir.toURI()+textFileName); //TODO 경로 저장 file:/ 시작
+//            S_Preference.setString(application, "saveStorage", saveStorage) //TODO 프리퍼런스에 경로 저장한다
+            Log.d("---", "---")
+            Log.w("//===========//", "================================================")
+            Log.d("","\n"+"[A_TextFile > 저장한 텍스트 파일 확인 실시]")
+            Log.d("", "\n[경로 : $saveStorage]")
+//            Log.d("", "\n[제목 : $nowTime]")
+            Log.d("", "\n[내용 : $saveData]")
+            Log.w("//===========//", "================================================")
+            Log.d("---", "---")
+            Toast.makeText(application, "텍스트 파일이 저장되었습니다", Toast.LENGTH_SHORT).show()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -102,7 +161,7 @@ class MainActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-        checkAudioPermission()
+        checkPermission()
 
         // Create application data directory on the device
         val modelsPath = getExternalFilesDir(null).toString()
