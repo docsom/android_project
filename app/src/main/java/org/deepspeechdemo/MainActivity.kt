@@ -25,6 +25,7 @@ import org.mozilla.deepspeech.libdeepspeech.DeepSpeechModel
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
+import java.lang.Thread.sleep
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
@@ -44,13 +45,12 @@ class MainActivity : AppCompatActivity() {
 
     var saveStorage = "" //저장된 파일 경로
     var saveData = "" //저장된 파일 내용
+    var finalText = ""
 
 //    private lateinit var mDownloadManager: DownloadManager
 //    private var mDownloadQueueId : Long = 0
 //
     private lateinit var mContext : Context
-
-    private var decoded = ""
 
 
     private fun checkPermission() {
@@ -96,7 +96,8 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { transcription.text = decoded }
             }
 
-            decoded = model.finishStream(streamContext)
+            val decoded = model.finishStream(streamContext)
+            finalText = decoded
 
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
@@ -223,8 +224,11 @@ class MainActivity : AppCompatActivity() {
 
     inner class SaveText: View.OnClickListener {
         override fun onClick(view : View?) {
-            writeTextFile(decoded)
-            decoded = ""
+            writeTextFile(finalText)
+            finalText = ""
+            runOnUiThread{
+                transcription.text = ""
+            }
         }
     }
 
