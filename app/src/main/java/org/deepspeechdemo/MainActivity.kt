@@ -13,6 +13,7 @@ import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Bundle
+import android.os.Environment
 import android.util.Log
 import android.view.View
 import android.widget.Button
@@ -25,10 +26,10 @@ import org.mozilla.deepspeech.libdeepspeech.DeepSpeechModel
 import java.io.BufferedWriter
 import java.io.File
 import java.io.FileWriter
-import java.lang.Thread.sleep
 import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.collections.ArrayList
 
 
 class MainActivity : AppCompatActivity() {
@@ -45,12 +46,8 @@ class MainActivity : AppCompatActivity() {
 
     var saveStorage = "" //저장된 파일 경로
     var saveData = "" //저장된 파일 내용
-    var finalText = ""
-
-//    private lateinit var mDownloadManager: DownloadManager
-//    private var mDownloadQueueId : Long = 0
-//
     private lateinit var mContext : Context
+    var finalText = ""
 
 
     private fun checkPermission() {
@@ -88,20 +85,49 @@ class MainActivity : AppCompatActivity() {
                 audioBufferSize
             )
             recorder.startRecording()
-
+            var cnt = 0
+            var idx = ArrayList<Int>()
+            var prevDecoded = ""
             while (isRecording.get()) {
                 recorder.read(audioData, 0, audioBufferSize)
                 model.feedAudioContent(streamContext, audioData, audioData.size)
                 val decoded = model.intermediateDecode(streamContext)
-                runOnUiThread { transcription.text = decoded }
+                val s = StringBuilder(decoded)
+                idx.sortedDescending().forEach { index ->
+                    if (index > 0 && index <= s.length) {
+                        s.insert(index, "\n\n")
+                    }
+                }
+                val processed = s.toString()
+                runOnUiThread { transcription.text = processed }
+                if (prevDecoded == decoded) {
+                    cnt++
+                }
+                else {
+                    cnt = 0
+                }
+                if (cnt > 70) {
+                    if (!idx.contains(decoded.length)) {
+                        idx.add(decoded.length)
+                    }
+                }
+                prevDecoded = decoded
             }
 
             val decoded = model.finishStream(streamContext)
-            finalText = decoded
+            val s = StringBuilder(decoded)
+            idx.sortedDescending().forEach { index ->
+                if (index > 0 && index <= s.length) {
+                    s.insert(index, "\n\n")
+                }
+            }
+            val processed = s.toString()
+            println(idx)
 
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
-                transcription.text = decoded
+                transcription.text = processed
+                writeTextFile(processed) // 텍스트 파일 저장
             }
 
             recorder.stop()
