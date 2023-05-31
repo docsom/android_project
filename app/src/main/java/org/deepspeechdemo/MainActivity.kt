@@ -1,18 +1,25 @@
 package org.deepspeechdemo
 
 import android.Manifest
+import android.app.DownloadManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.content.pm.PackageManager
+import android.database.Cursor
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.os.Build
+import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.util.Log
 import android.view.View
+import android.widget.Button
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import kotlinx.android.synthetic.main.activity_main.*
 import org.mozilla.deepspeech.libdeepspeech.DeepSpeechModel
 import java.io.BufferedWriter
@@ -32,8 +39,18 @@ class MainActivity : AppCompatActivity() {
     private val TFLITE_MODEL_FILENAME = "deepspeech-0.9.2-models.tflite"
     private val SCORER_FILENAME = "deepspeech-0.9.2-models.scorer"
 
+    private val TFLITE_MODEL_URL = "https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-models.tflite"
+    private val SCORER_URL = "https://github.com/mozilla/DeepSpeech/releases/download/v0.9.2/deepspeech-0.9.2-models.scorer"
+
     var saveStorage = "" //저장된 파일 경로
     var saveData = "" //저장된 파일 내용
+
+//    private lateinit var mDownloadManager: DownloadManager
+//    private var mDownloadQueueId : Long = 0
+//
+    private lateinit var mContext : Context
+
+    private var decoded = ""
 
 
     private fun checkPermission() {
@@ -79,12 +96,11 @@ class MainActivity : AppCompatActivity() {
                 runOnUiThread { transcription.text = decoded }
             }
 
-            val decoded = model.finishStream(streamContext)
+            decoded = model.finishStream(streamContext)
 
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
                 transcription.text = decoded
-                writeTextFile(decoded) // 텍스트 파일 저장
             }
 
             recorder.stop()
@@ -140,7 +156,11 @@ class MainActivity : AppCompatActivity() {
 
         for (path in listOf(tfliteModelPath, scorerPath)) {
             if (!File(path).exists()) {
-                status.append("Model creation failed: $path does not exist.\n")
+                Toast.makeText(
+                    mContext,
+                    "Model creation failed: $path does not exist.\n",
+                    Toast.LENGTH_SHORT
+                ).show()
                 return false
             }
         }
@@ -162,11 +182,20 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         checkPermission()
+        mContext = this
+        //mDownloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
         // Create application data directory on the device
         val modelsPath = getExternalFilesDir(null).toString()
 
-        status.text = "Ready. Copy model files to \"$modelsPath\" if running for the first time.\n"
+        Toast.makeText(
+            mContext,
+            "Ready. Download model files to \"$modelsPath\" if running for the first time.\n",
+            Toast.LENGTH_SHORT
+        ).show()
+
+        val saveBtn = findViewById<Button>(R.id.btnSave)
+        saveBtn.setOnClickListener(SaveText())
     }
 
     private fun stopListening() {
@@ -178,13 +207,24 @@ class MainActivity : AppCompatActivity() {
             if (!createModel()) {
                 return
             }
-            status.append("Created model.\n")
+            Toast.makeText(mContext, "Create Model", Toast.LENGTH_SHORT).show()
         }
+
+        val saveBtn = findViewById<Button>(R.id.btnSave)
 
         if (isRecording.get()) {
             stopListening()
+            saveBtn.visibility = View.VISIBLE
         } else {
             startListening()
+            saveBtn.visibility = View.GONE
+        }
+    }
+
+    inner class SaveText: View.OnClickListener {
+        override fun onClick(view : View?) {
+            writeTextFile(decoded)
+            decoded = ""
         }
     }
 
@@ -194,4 +234,80 @@ class MainActivity : AppCompatActivity() {
             model?.freeModel()
         }
     }
+
+//    override fun onResume(){
+//        super.onResume()
+//        val completeFilter = IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE)
+//        registerReceiver(downloadCompleteReceiver, completeFilter)
+//    }
+//
+//    override fun onPause() {
+//        super.onPause()
+//        unregisterReceiver(downloadCompleteReceiver)
+//    }
+//
+//    private fun URLDownloading(url: Uri, fileName : String) {
+//        val modelsPath = getExternalFilesDir(null).toString()
+//        val outputFile = File("$modelsPath/$fileName")
+//        val downloadUri: Uri = url
+//        val request = DownloadManager.Request(downloadUri)
+//        val pathSegmentList: List<String> = downloadUri.getPathSegments()
+//        request.setTitle("다운로드 항목")
+//        request.setDestinationUri(Uri.fromFile(outputFile))
+//        request.setAllowedOverMetered(true)
+//        println("다운로드 시작")
+//        mDownloadQueueId = mDownloadManager.enqueue(request)
+//    }
+//
+//    private var downloadCompleteReceiver : BroadcastReceiver = object : BroadcastReceiver(){
+//        override fun onReceive(context: Context, intent: Intent) {
+//            val reference = intent.getLongExtra(DownloadManager.EXTRA_DOWNLOAD_ID, -1)
+//
+//            if (mDownloadQueueId == reference) {
+//                val query = DownloadManager.Query() // 다운로드 항목 조회에 필요한 정보 포함
+//                query.setFilterById(reference)
+//                val cursor: Cursor = mDownloadManager.query(query)
+//                cursor.moveToFirst()
+//                val columnIndex: Int = cursor.getColumnIndex(DownloadManager.COLUMN_STATUS)
+//                val columnReason: Int = cursor.getColumnIndex(DownloadManager.COLUMN_REASON)
+//                val status: Int = cursor.getInt(columnIndex)
+//                val reason: Int = cursor.getInt(columnReason)
+//                cursor.close()
+//                when (status) {
+//                    DownloadManager.STATUS_SUCCESSFUL -> Toast.makeText(
+//                        mContext,
+//                        "다운로드를 완료하였습니다.",
+//                        Toast.LENGTH_SHORT
+//                    ).show()
+//                    DownloadManager.STATUS_PAUSED -> Toast.makeText(
+//                        mContext,
+//                        "다운로드가 중단되었습니다.",
+//                        Toast.LENGTH_SHORT
+//                    ).show()
+//                    DownloadManager.STATUS_FAILED -> Toast.makeText(
+//                        mContext,
+//                        "다운로드가 취소되었습니다.",
+//                        Toast.LENGTH_SHORT
+//                    ).show()
+//                }
+//            }
+//        }
+//    }
+//
+//    inner class DownloadModel: View.OnClickListener {
+//        override fun onClick(view : View?) {
+//            val modelsPath = getExternalFilesDir(null).toString()
+//
+//            if (!File("$modelsPath/$TFLITE_MODEL_FILENAME").exists()) {
+//                URLDownloading(Uri.parse(TFLITE_MODEL_URL), TFLITE_MODEL_FILENAME)
+//            }
+//
+//            if (!File("$modelsPath/$SCORER_FILENAME").exists()) {
+//                URLDownloading(Uri.parse(SCORER_URL), SCORER_FILENAME)
+//            }
+//
+//            val downloadBtn = findViewById<Button>(R.id.btnDownload)
+//            downloadBtn.visibility = View.GONE
+//        }
+//    }
 }
