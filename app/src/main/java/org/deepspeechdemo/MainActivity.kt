@@ -24,6 +24,7 @@ import java.text.SimpleDateFormat
 import java.util.*
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.collections.ArrayList
+import kotlin.collections.HashMap
 
 
 class MainActivity : AppCompatActivity() {
@@ -80,14 +81,15 @@ class MainActivity : AppCompatActivity() {
             )
             recorder.startRecording()
             var cnt = 0
-            var idx = ArrayList<Int>()
+            var idx = HashMap<Int, String>()
             var prevDecoded = ""
+            val startTime = "[" + getCurrentTime() + "]\n"
             while (isRecording.get()) {
                 println(cnt)
                 recorder.read(audioData, 0, audioBufferSize)
                 model.feedAudioContent(streamContext, audioData, audioData.size)
                 val decoded = model.intermediateDecode(streamContext)
-                val processed = processText(decoded, idx)
+                val processed = processText(decoded, idx, startTime)
                 runOnUiThread { transcription.text = processed }
                 if(prevDecoded == decoded){
                     if(cnt<=50) {
@@ -98,7 +100,7 @@ class MainActivity : AppCompatActivity() {
                 }
                 if(cnt > 10){
                     if(!(idx.contains(decoded.length))) {
-                        idx.add(decoded.length)
+                        idx[decoded.length] = getCurrentTime()
                     }
                 }
                 prevDecoded = decoded
@@ -106,7 +108,7 @@ class MainActivity : AppCompatActivity() {
 
             val decoded = model.finishStream(streamContext)
             println(idx)
-            val processed = processText(decoded, idx)
+            val processed = processText(decoded, idx, startTime)
 
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
@@ -121,14 +123,25 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun processText(str : String, idx : ArrayList<Int>) : String {
+    private fun getCurrentTime() : String {
+        val timeStamp = System.currentTimeMillis()
+        val sdf = SimpleDateFormat("HH:mm:ss")
+        return sdf.format(timeStamp)
+    }
+
+    private fun processText(str : String, idx : HashMap<Int, String>, textPrefix : String?) : String {
         val s = StringBuilder(str)
-        idx.sortedDescending().forEach { index ->
+        idx.keys.sortedDescending().forEach { index ->
             if (index > 0 && index <= s.length) {
-                s.insert(index, "\n\n")
+                val currentDate = idx[index]
+                s.insert(index, "\n\n[$currentDate]\n")
             }
         }
-        return s.toString()
+        if(textPrefix.isNullOrBlank()){
+            return s.toString()
+        } else {
+            return textPrefix + s.toString()
+        }
     }
 
     private fun writeTextFile(data: String) {
