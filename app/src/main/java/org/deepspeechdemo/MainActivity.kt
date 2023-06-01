@@ -1,19 +1,12 @@
 package org.deepspeechdemo
 
 import android.Manifest
-import android.app.DownloadManager
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.content.pm.PackageManager
-import android.database.Cursor
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.MediaRecorder
-import android.net.Uri
 import android.os.Bundle
-import android.os.Environment
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.View
@@ -22,7 +15,6 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import kotlinx.android.synthetic.main.activity_main.*
 import org.mozilla.deepspeech.libdeepspeech.DeepSpeechModel
 import java.io.BufferedWriter
@@ -91,54 +83,52 @@ class MainActivity : AppCompatActivity() {
             var idx = ArrayList<Int>()
             var prevDecoded = ""
             while (isRecording.get()) {
+                println(cnt)
                 recorder.read(audioData, 0, audioBufferSize)
                 model.feedAudioContent(streamContext, audioData, audioData.size)
                 val decoded = model.intermediateDecode(streamContext)
-//                val s = StringBuilder(decoded)
-//                idx.sortedDescending().forEach { index ->
-//                    if (index > 0 && index <= s.length) {
-//                        s.insert(index, "\n\n")
-//                    }
-//                }
-//                val processed = s.toString()
-                runOnUiThread { transcription.text = decoded }
-//                if (prevDecoded == decoded) {
-//                    println("silence...")
-//                }
-//                else {
-//                    println("listening...")
-//                }
-//                if (cnt > 70) {
-//                    if (!idx.contains(decoded.length)) {
-//                        idx.add(decoded.length)
-//                    }
-//                }
-//                prevDecoded = decoded
+                val processed = processText(decoded, idx)
+                runOnUiThread { transcription.text = processed }
+                if(prevDecoded == decoded){
+                    if(cnt<=50) {
+                        cnt++
+                    }
+                } else {
+                    cnt = 0
+                }
+                if(cnt > 10){
+                    if(!(idx.contains(decoded.length))) {
+                        idx.add(decoded.length)
+                    }
+                }
+                prevDecoded = decoded
             }
 
             val decoded = model.finishStream(streamContext)
             println(idx)
-            val s = StringBuilder(decoded)
-            idx.sortedDescending().forEach { index ->
-                if (index > 0 && index <= s.length) {
-                    s.insert(index, "\n\n")
-                }
-            }
-            val processed = s.toString()
+            val processed = processText(decoded, idx)
 
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
                 transcription.text = processed
-                if(processed.isNotEmpty()){
-                    val saveBtn = findViewById<Button>(R.id.btnSave)
-                    saveBtn.visibility = View.VISIBLE
-                }
             }
             finalText = processed
+
+
 
             recorder.stop()
             recorder.release()
         }
+    }
+
+    private fun processText(str : String, idx : ArrayList<Int>) : String {
+        val s = StringBuilder(str)
+        idx.sortedDescending().forEach { index ->
+            if (index > 0 && index <= s.length) {
+                s.insert(index, "\n\n")
+            }
+        }
+        return s.toString()
     }
 
     private fun writeTextFile(data: String) {
@@ -229,7 +219,6 @@ class MainActivity : AppCompatActivity() {
 
         val saveBtn = findViewById<Button>(R.id.btnSave)
         saveBtn.setOnClickListener(SaveText())
-        saveBtn.visibility = View.GONE
 
         val transTextView = findViewById<TextView>(R.id.transcription)
         transTextView.movementMethod = ScrollingMovementMethod()
@@ -251,6 +240,7 @@ class MainActivity : AppCompatActivity() {
 
         if (isRecording.get()) {
             stopListening()
+            saveBtn.visibility = View.VISIBLE
         } else {
             startListening()
             saveBtn.visibility = View.GONE
@@ -259,14 +249,12 @@ class MainActivity : AppCompatActivity() {
 
     inner class SaveText: View.OnClickListener {
         override fun onClick(view : View?) {
-            writeTextFile(finalText)
-            finalText = ""
-            runOnUiThread{
-                transcription.text = ""
+            if(finalText.isNotEmpty()){
+                writeTextFile(finalText)
+            } else {
+                Toast.makeText(mContext, "There is no text to save or the text is already saved.", Toast.LENGTH_SHORT).show()
             }
-
-            val saveBtn = findViewById<Button>(R.id.btnSave)
-            saveBtn.visibility = View.GONE
+            finalText = ""
         }
     }
 
