@@ -14,9 +14,11 @@ import android.media.MediaRecorder
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.View
 import android.widget.Button
+import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -92,29 +94,30 @@ class MainActivity : AppCompatActivity() {
                 recorder.read(audioData, 0, audioBufferSize)
                 model.feedAudioContent(streamContext, audioData, audioData.size)
                 val decoded = model.intermediateDecode(streamContext)
-                val s = StringBuilder(decoded)
-                idx.sortedDescending().forEach { index ->
-                    if (index > 0 && index <= s.length) {
-                        s.insert(index, "\n\n")
-                    }
-                }
-                val processed = s.toString()
-                runOnUiThread { transcription.text = processed }
-                if (prevDecoded == decoded) {
-                    cnt++
-                }
-                else {
-                    cnt = 0
-                }
-                if (cnt > 70) {
-                    if (!idx.contains(decoded.length)) {
-                        idx.add(decoded.length)
-                    }
-                }
-                prevDecoded = decoded
+//                val s = StringBuilder(decoded)
+//                idx.sortedDescending().forEach { index ->
+//                    if (index > 0 && index <= s.length) {
+//                        s.insert(index, "\n\n")
+//                    }
+//                }
+//                val processed = s.toString()
+                runOnUiThread { transcription.text = decoded }
+//                if (prevDecoded == decoded) {
+//                    println("silence...")
+//                }
+//                else {
+//                    println("listening...")
+//                }
+//                if (cnt > 70) {
+//                    if (!idx.contains(decoded.length)) {
+//                        idx.add(decoded.length)
+//                    }
+//                }
+//                prevDecoded = decoded
             }
 
             val decoded = model.finishStream(streamContext)
+            println(idx)
             val s = StringBuilder(decoded)
             idx.sortedDescending().forEach { index ->
                 if (index > 0 && index <= s.length) {
@@ -122,13 +125,16 @@ class MainActivity : AppCompatActivity() {
                 }
             }
             val processed = s.toString()
-            println(idx)
 
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
                 transcription.text = processed
-                writeTextFile(processed) // 텍스트 파일 저장
+                if(processed.isNotEmpty()){
+                    val saveBtn = findViewById<Button>(R.id.btnSave)
+                    saveBtn.visibility = View.VISIBLE
+                }
             }
+            finalText = processed
 
             recorder.stop()
             recorder.release()
@@ -223,6 +229,10 @@ class MainActivity : AppCompatActivity() {
 
         val saveBtn = findViewById<Button>(R.id.btnSave)
         saveBtn.setOnClickListener(SaveText())
+        saveBtn.visibility = View.GONE
+
+        val transTextView = findViewById<TextView>(R.id.transcription)
+        transTextView.movementMethod = ScrollingMovementMethod()
     }
 
     private fun stopListening() {
@@ -241,7 +251,6 @@ class MainActivity : AppCompatActivity() {
 
         if (isRecording.get()) {
             stopListening()
-            saveBtn.visibility = View.VISIBLE
         } else {
             startListening()
             saveBtn.visibility = View.GONE
@@ -255,6 +264,9 @@ class MainActivity : AppCompatActivity() {
             runOnUiThread{
                 transcription.text = ""
             }
+
+            val saveBtn = findViewById<Button>(R.id.btnSave)
+            saveBtn.visibility = View.GONE
         }
     }
 
