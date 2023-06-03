@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     var saveData = "" //저장된 파일 내용
     private lateinit var mContext : Context
     var finalText = ""
+    var keywords = ArrayList<String>()
 
 
     private fun checkPermission() {
@@ -92,7 +93,7 @@ class MainActivity : AppCompatActivity() {
                 val processed = processText(decoded, idx, startTime)
                 runOnUiThread { transcription.text = processed }
                 if(prevDecoded == decoded){
-                    if(cnt<=50) {
+                    if(cnt <= 10) {
                         cnt++
                     }
                 } else {
@@ -116,7 +117,11 @@ class MainActivity : AppCompatActivity() {
             }
             finalText = processed
 
-
+            val keywordModel = RakeModel()
+            keywordModel.minKeywordFrequency = 1
+            keywords = keywordModel.run(decoded) // 키워드 전체 저장
+            println(keywords)
+            //TODO 키워드 ui에 띄우기
 
             recorder.stop()
             recorder.release()
@@ -144,18 +149,33 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private fun topKeywords(keywords:ArrayList<String>, topNum:Int) : String {
+        val sb = StringBuffer()
+        sb.append("Keywords: ")
+        var i = 1
+        for (keyword in keywords) {
+            sb.append(keyword)
+            if (i >= topNum || i == keywords.size) {
+                break
+            }
+            sb.append(", ")
+            i++
+        }
+        return sb.toString()
+    }
+
     private fun writeTextFile(data: String) {
         try {
-            saveData = data //TODO 변수에 값 대입
-            val currentTime : Long = System.currentTimeMillis() //TODO 현재시간 받아오기
+            saveData = data // 변수에 값 대입
+            val currentTime : Long = System.currentTimeMillis() // 현재시간 받아오기
             val sdf = SimpleDateFormat("yyyy-MM-dd HH:mm:ss", Locale("ko", "KR"))
             val nowTime = sdf.format(currentTime)
-            val textFileName = "/$nowTime.txt" //TODO 파일 생성
+            val textFileName = "/$nowTime.txt" // 파일 생성
             val storageDir =
-                File(getExternalFilesDir(null).toString() + "/SaveStorage") //TODO 저장 경로
-            //TODO 폴더 생성
-            if (!storageDir.exists()) { //TODO 폴더 없을 경우
-                storageDir.mkdir() //TODO 폴더 생성
+                File(getExternalFilesDir(null).toString() + "/SaveStorage") // 저장 경로
+            // 폴더 생성
+            if (!storageDir.exists()) { // 폴더 없을 경우
+                storageDir.mkdir() // 폴더 생성
             }
 
             val buf = BufferedWriter(
@@ -163,19 +183,16 @@ class MainActivity : AppCompatActivity() {
                     storageDir.toString() + textFileName,
                     false
                 )
-            ) //TODO 덮어쓰기 (FALSE)
-//            buf.append("[$nowTime]\n[$saveData]") //TODO 날짜 쓰기
-//            buf.newLine() //TODO 개행
+            ) // 덮어쓰기 (FALSE)
+//            buf.append("[$nowTime]\n[$saveData]") // 날짜 쓰기
+//            buf.newLine() // 개행
             buf.write(saveData)
             buf.close()
-            saveStorage = storageDir.toString() + textFileName //TODO 경로 저장 /storage 시작
-            //saveStorage = String.valueOf(storageDir.toURI()+textFileName); //TODO 경로 저장 file:/ 시작
-//            S_Preference.setString(application, "saveStorage", saveStorage) //TODO 프리퍼런스에 경로 저장한다
+            saveStorage = storageDir.toString() + textFileName // 경로 저장 /storage 시작
             Log.d("---", "---")
             Log.w("//===========//", "================================================")
             Log.d("","\n"+"[A_TextFile > 저장한 텍스트 파일 확인 실시]")
             Log.d("", "\n[경로 : $saveStorage]")
-//            Log.d("", "\n[제목 : $nowTime]")
             Log.d("", "\n[내용 : $saveData]")
             Log.w("//===========//", "================================================")
             Log.d("---", "---")
@@ -263,11 +280,13 @@ class MainActivity : AppCompatActivity() {
     inner class SaveText: View.OnClickListener {
         override fun onClick(view : View?) {
             if(finalText.isNotEmpty()){
-                writeTextFile(finalText)
+                writeTextFile(finalText) //TODO 키워드 추가해서 저장되게 하기
+//                writeTextFile(topKeywords(keywords, 5)+"\n"+finalText)
             } else {
                 Toast.makeText(mContext, "There is no text to save or the text is already saved.", Toast.LENGTH_SHORT).show()
             }
             finalText = ""
+            keywords.clear()
         }
     }
 
