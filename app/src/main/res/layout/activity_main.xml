@@ -21,6 +21,27 @@
             android:text="Download Model" />
 
         <TextView
+            android:id="@+id/labelKeywords"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0"
+            android:text="Keywords"
+            android:textSize="18sp"
+            android:textStyle="bold" />
+
+        <TextView
+            android:id="@+id/keywords"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_weight="0"
+            android:scrollbars="vertical"
+            android:text="Keywords will appear here after listening."
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintLeft_toLeftOf="parent"
+            app:layout_constraintRight_toRightOf="parent"
+            app:layout_constraintTop_toTopOf="parent" />
+
+        <TextView
             android:id="@+id/labelTranscription"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

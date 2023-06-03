@@ -31,6 +31,7 @@ class MainActivity : AppCompatActivity() {
     private var model: DeepSpeechModel? = null
 
     private var transcriptionThread: Thread? = null
+    private var keywordsThread: Thread? = null
     private var isRecording: AtomicBoolean = AtomicBoolean(false)
 
     private val TFLITE_MODEL_FILENAME = "deepspeech-0.9.2-models.tflite"
@@ -43,7 +44,7 @@ class MainActivity : AppCompatActivity() {
     var saveData = "" //저장된 파일 내용
     private lateinit var mContext : Context
     var finalText = ""
-    var keywords = ArrayList<String>()
+    var keywordsList = ArrayList<String>()
 
 
     private fun checkPermission() {
@@ -111,17 +112,17 @@ class MainActivity : AppCompatActivity() {
             println(idx)
             val processed = processText(decoded, idx, startTime)
 
+            val keywordModel = RakeModel()
+            keywordModel.minKeywordFrequency = 1
+            keywordsList = keywordModel.run(decoded) // 키워드 전체 저장
+            val keywordsText = topKeywords(keywordModel.run(decoded), 10)
+
             runOnUiThread {
                 btnStartInference.text = "Start Recording"
                 transcription.text = processed
+                keywords.text = keywordsText
             }
-            finalText = processed
-
-            val keywordModel = RakeModel()
-            keywordModel.minKeywordFrequency = 1
-            keywords = keywordModel.run(decoded) // 키워드 전체 저장
-            println(keywords)
-            //TODO 키워드 ui에 띄우기
+            finalText = "Keywords: $keywordsText\n\n$processed"
 
             recorder.stop()
             recorder.release()
@@ -151,7 +152,6 @@ class MainActivity : AppCompatActivity() {
 
     private fun topKeywords(keywords:ArrayList<String>, topNum:Int) : String {
         val sb = StringBuffer()
-        sb.append("Keywords: ")
         var i = 1
         for (keyword in keywords) {
             sb.append(keyword)
@@ -229,6 +229,7 @@ class MainActivity : AppCompatActivity() {
             transcriptionThread = Thread(Runnable { transcribe() }, "Transcription Thread")
             transcriptionThread?.start()
         }
+        keywords.text = ""
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -280,13 +281,12 @@ class MainActivity : AppCompatActivity() {
     inner class SaveText: View.OnClickListener {
         override fun onClick(view : View?) {
             if(finalText.isNotEmpty()){
-                writeTextFile(finalText) //TODO 키워드 추가해서 저장되게 하기
-//                writeTextFile(topKeywords(keywords, 5)+"\n"+finalText)
+                writeTextFile(finalText)
             } else {
                 Toast.makeText(mContext, "There is no text to save or the text is already saved.", Toast.LENGTH_SHORT).show()
             }
             finalText = ""
-            keywords.clear()
+            keywordsList.clear()
         }
     }
 

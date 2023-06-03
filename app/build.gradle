@@ -22,13 +22,14 @@ android {
         }
     }
     // Specify tflite file should not be compressed for the app apk
-    aaptOptions {
-        noCompress "tflite"
-    }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+    androidResources {
+        noCompress 'tflite'
+    }
+    namespace 'org.deepspeechdemo'
 }
 
 dependencies {
