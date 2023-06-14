@@ -57,8 +57,6 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun transcribe() {
-        // We read from the recorder in chunks of 2048 shorts. With a model that expects its input
-        // at 16000Hz, this corresponds to 2048/16000 = 0.128s or 128ms.
         val audioBufferSize = 2048
         val audioData = ShortArray(audioBufferSize)
 
@@ -183,12 +181,10 @@ class MainActivity : AppCompatActivity() {
                     storageDir.toString() + textFileName,
                     false
                 )
-            ) // 덮어쓰기 (FALSE)
-//            buf.append("[$nowTime]\n[$saveData]") // 날짜 쓰기
-//            buf.newLine() // 개행
+            )
             buf.write(saveData)
             buf.close()
-            saveStorage = storageDir.toString() + textFileName // 경로 저장 /storage 시작
+            saveStorage = storageDir.toString() + textFileName
             Log.d("---", "---")
             Log.w("//===========//", "================================================")
             Log.d("","\n"+"[A_TextFile > 저장한 텍스트 파일 확인 실시]")
@@ -237,9 +233,7 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         checkPermission()
         mContext = this
-        //mDownloadManager = getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
 
-        // Create application data directory on the device
         val modelsPath = getExternalFilesDir(null).toString()
 
         Toast.makeText(
